@@ -230,7 +230,9 @@ finally we change the `start:dev` script in the `package.json` to:
 }
 ```
 
-now we can run `npm run start:dev` to start our api server, on start it should pick up the config from the configService what then will connect typeORM to our database.
+Like this we can run `npm run start:dev` to start our API-server, 
+that on start it should pick up the config from the configService 
+what then will connect typeORM to our database - sweet!
 
 ## Define your data model entities.
 
@@ -297,11 +299,17 @@ export class Item extends BaseEntity {
 }
 ```
 
-## Party time - Let’s start our API and see if it works. By running 
+## Party time - Let’s start our API and see if it works. 
 
-<code start DB> 
+start the db server 
+```bash 
+npm start:dev:db
+```
 
-<code start API>
+start the api server
+```bash
+npm run start:dev
+```
 
 Cool, it does not crash - but does our database actually reflect our data model? 
 We can check this by running some cli queries against the DB or using a database management tool for quick debugging. 
