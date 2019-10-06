@@ -317,6 +317,8 @@ That's why i prefer to work with propper database migrations in code straight fr
 So lets handle this - lucky TypeORM comes with a solution and a CLI for this. 
 
 Here is how to set that CLI up nicely. 
+
+## 1. setup for the typeORM CLI 
 we have already added all nessesary config with our `configService`, 
 but the typeORM CLI works with an `ormconfig.json` where it expects the correct config to be in. 
 
@@ -333,14 +335,56 @@ fs.writeFileSync(
 );
 ```
 
-and lets add a npm script task to run it.
+and lets add a npm script task to run it as well as commands for `typeorm:migration:generate` and `typeorm:migration:run`.
+like this the ormconfig will be generated before running the typeORM CLI commands.
+
 ```json
 {
   "pretypeorm": "(rm ormconfig.json || :) && ts-node -r tsconfig-paths/register src/scripts/write-type-orm-config.ts",
+   "typeorm": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js",
+   "typeorm:migration:generate": "npm run typeorm -- migration:generate -n",
+   "typeorm:migration:run": "npm run typeorm -- migration:run"
 }
 ```
 
-<--- WIP --->
+## 2. Create a inital migration
+
+now we can run:
+```bash 
+npm run typeorm:migration:generate -- init
+```
+
+this will connect the typeORM to your database and check if the model (tables) in your database fit the model entities you have defined in your porject and will use this info to generate a database migration script `init-<timestamp>.ts` (in typescript) and put it into your `/migrations` folder of your project.
+Note: You should commit these migration scritps to your source controle and treat these files read only! 
+If you want to change something the idea is to add another migration on top using the 
+`npm run typeorm:migration:generate -- <your_migration_name>` command. 
+
+<screenshot-3>
+
+## 3. Run your migrations 
+
+Simply run:
+```bash
+npm run typeorm:migration:run
+```
+So now we have all the tooling we need to create and run migrations without running the API server project, what is nice because it give us a lot of flexebillity when developing. 
+
+On production or stanging enviropments however you actually often want to auto run your migration scrips before starting your API server. 
+
+to do so, you can simply add a start script where you can also add an env-variable `RUN_MIGRATIONS=<0|1>` to controle this.
+```bash
+#!/bin/bash
+set -e
+set -x
+
+if [ "$RUN_MIGRATIONS" ]; then
+    echo "RUNNING MIGRATIONS";
+    npm run typeorm:migration:run 
+fi
+
+echo "START SERVER";
+cd dist && node main.js
+```
 
 ## Debugging the database 
 
