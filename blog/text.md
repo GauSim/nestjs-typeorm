@@ -164,13 +164,11 @@ export class ConfigService {
       entities: ['**/*.entity{.ts,.js}'],
 
       migrationsTableName: 'migration',
-
       migrations: ['src/migration/*.ts'],
-
       cli: {
         migrationsDir: 'src/migration',
       },
-
+      synchronize: false,
       ssl: this.isProduction(),
     };
   }
@@ -235,13 +233,6 @@ that on start it should pick up the config from the configService
 what then will connect typeORM to our database - sweet!
 
 ## Define your data model entities.
-
-As mentioned earlier, TypeORM is able to synchronize your data model into tables in your database. 
-This synchronization of the model is nice, but also dangerous.
-
-Why? In early development it’s great - you don’t have all your data models figured out jet. So, you change the Model in code, and all just works out nicely on the database. Basically, you don’t have to think about the state your database is in that much. 
-
-But here comes the tricky part. Once you have actual data in your database you do not want to lose on every model change it get a bit more complicated. This sync works in a way, that it would to apply the necessary changes to your database tables by drop and recreating them. Meaning you lose the data inside the table. What of cause in production you should avoid.
 
 TypeORM supports auto loading of your data model entities. You can simply place all of them in one folder and load them with a pattern in your configuration we put ours `model/<name>.entity.ts`. (see the `entities` prop on the `TypeOrmModuleOptions` in the `ConfigService`) 
 
@@ -311,9 +302,50 @@ start the api server
 npm run start:dev
 ```
 
+... cool - that seems to work, but actually our database does not reflect our data model jet. 
+
+## Apply the Schema, generate and run database migrations 
+
+As mentioned earlier, TypeORM is able to synchronize your data model into tables in your database. 
+This synchronization of the model is nice, but also dangerous.
+
+Why? In early development it’s great - you don’t have all your data models figured out jet. So, you change the Model in code, and all just works out nicely on the database. Basically, you don’t have to think about the state your database is in that much. 
+
+But here comes the tricky part. Once you have actual data in your database you do not want to lose on every model change it get a bit more complicated. This sync works in a way, that it would to apply the necessary changes to your database tables by drop and recreating them. Meaning you lose the data inside the table. What of cause in production you should avoid.
+
+That's why i prefer to work with propper database migrations in code straight from the beginning. 
+So lets handle this - lucky TypeORM comes with a solution and a CLI for this. 
+
+Here is how to set that CLI up nicely. 
+we have already added all nessesary config with our `configService`, 
+but the typeORM CLI works with an `ormconfig.json` where it expects the correct config to be in. 
+
+lets add a quick helper script to write the file and add it to our `.gitignore`-list, 
+as we will generate it before using the CLI.
+
+helper script `src/scripts/write-type-orm-config.ts`: 
+```typescript
+import { configService } from '../config/config.service';
+import fs = require('fs');
+fs.writeFileSync(
+  'ormconfig.json',
+  JSON.stringify(configService.getTypeOrmConfig(), null, 2)
+);
+```
+
+and lets add a npm script task to run it.
+```json
+{
+  "pretypeorm": "(rm ormconfig.json || :) && ts-node -r tsconfig-paths/register src/scripts/write-type-orm-config.ts",
+}
+```
+
+<--- WIP --->
+
+## Debugging the database 
+
 Cool, it does not crash - but does our database actually reflect our data model? 
 We can check this by running some cli queries against the DB or using a database management tool for quick debugging. 
-
 
 When working with postgres database I use <tool>
 
@@ -354,8 +386,5 @@ This is how a seed script could look like:
 
 You can now add an NPM script task you can either run right after the DB setup script and before the server start or on its own to create more data. 
 
-Nice setup done - but there is one more thing. Let’s get rid of this Schema sync. Why? Because this we will not be able to do in production, as early mentioned - when the server starts and the sync happens, we lose data. So, let’s handle the Data migration part. Lucky TypeORM comes with a solution and a CLI for this. 
-
-Turn off Model sync as early as possible and Running migrations.
 
 Run migrations on start with flag.
