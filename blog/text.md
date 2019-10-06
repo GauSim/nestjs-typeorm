@@ -34,36 +34,55 @@ npm run start:dev
 
  
 
-Setting up the database server.
+## Setting up the database server.
 
 So now we have our project baselines setup, let’s add some data persistence layer. 
 
- 
+We’ll use TypeORM to manage our database and schema. What is nice about TypeORM is, that it allows you to model your data entities in type save code and then is able to apply (sync) these models into the table structure in your database. (By the way, this not only works with postgres databases, but also other databases, find more info on with databases are supported [here](https://typeorm.io))
 
-We’ll use TypeORM to manage our database and schema. What is nice about TypeORM is, that it allows you to model your data entities in type save code and then is able to apply (sync) these models into the table structure in your database. (By the way, this not only works with postgres databases, but also other databases, find more info on with databases are supported here. <link>)
-
- 
-
-Setting up a local postgres database instance with automation! 
-
- 
+## Setting up a local postgres database instance with automation! 
 
 To work locally with data persistence, we now would need a database server and a database to connect to. One way would be to setup a postgres database server on your local machine, what I’m not a big fan of. Why? This would tie the project to my machine a lot. Meaning if you work on a project with a team or you simply switch machines you would have to do this on every machine again or writing somehow to setup guide etc. (when you have the also different operating systems on these machines, things get even more icky)
 
 so how do we overcome this?
 
- 
-
 We automate! We use prebuild postgres docker image and run the database sever as a docker process. Like this we can script e whole setup with a couple lines of shell code to get our server instance running and prepare an empty database ready to connect to. This is great because it’s reproducible and the setup code can be managed in source control together with the rest of the project code. What makes the “getting started” for other dev’s in your team super straightforward. 
 
- 
-
 Here is how this script would look like: 
+```bash
+#!/bin/bash
+set -e
 
-<code> 
+SERVER="my_database_server";
+PW="mysecretpassword";
+DB="my_database";
 
- 
+echo "echo stop & remove old docker [$SERVER]";
+echo "echo starting new fresh instance of [$SERVER]"
+(docker kill $SERVER || :) && \
+  (docker rm $SERVER || :) && \
+  docker run --name $SERVER -e POSTGRES_PASSWORD=$PW \
+  -e PGPASSWORD=$PW \
+  -p 5432:5432 \
+  -d postgres
 
+# wait for pg to start
+echo "sleep wait for pg-server [$SERVER] to start";
+SLEEP 3;
+
+# create the db 
+echo "CREATE DATABASE $DB ENCODING 'UTF-8';" | docker exec -i $SERVER psql -U postgres
+echo "\l" | docker exec -i $SERVER psql -U postgres
+``` 
+
+Lets add that command to our package.json run-scripts so we can easy execute it.
+```json
+...
+    "start:dev": "nest start --watch",
+    "start:dev:db": "./src/scripts/start-db.sh",
+    "start:debug": "nest start --debug --watch",
+...
+```
 Sweet, now we have a command we can call and it would setup the DB server.
 
 To make the process more robust, we will always use the same name for the docker container - like this we can add an additional check - if the container is running already kill it to ensure a clean state. We will come to why this is a good practice later in the “seed data section”.
