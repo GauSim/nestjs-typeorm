@@ -1,0 +1,22 @@
+{
+  "name": "nestjs-typeorm",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GauSim/nestjs-typeorm.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/GauSim/nestjs-typeorm/issues"
+  },
+  "homepage": "https://github.com/GauSim/nestjs-typeorm#readme",
+  "dependencies": {
+    "@nestjs/cli": "^6.10.1"
+  }
+}

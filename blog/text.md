@@ -1,50 +1,40 @@
-Local development setup working with Database migrations In TypeORM, NestJS Postures and Docker 
-
- 
+# Local development setup working with Database migrations In TypeORM, NestJS Postures and Docker. 
 
 Working with stateful data and databases is hard, especially when your project grows overtime. To have a good development and project setup right from the beginning is essential for the success of your development project. In this Post I want to show you how I have setup most of the projects and try to highlight some of the thoughts behind the setup. 
 
- 
-
 In this example we’ll work on a simple NodeJS API that is powered by a Postgres database for data storage. 
-
- 
 
 <architecture diagram>
 
- 
+ To build our API in NodeJS we will use NestJS. It’s a pretty flexible framework and is built on ExpressJS principals and lets you craft out NodeJS services in no time as it comes with a lot of goodies (like full typescript support, dependency injection, module management) backed in. To kick off things even faster it comes with a nice CLI tool that handles the boilerplate for you. For me the generated NestJS project from the CLI is a perfect starter. 
 
-To build our API in NodeJS we will use NestJS. It’s a pretty flexible framework and is built on ExpressJS principals and lets you craft out NodeJS services in no time as it comes with a lot of goodies (like full typescript support, dependency injection, module management) backed in. To kick off things even faster it comes with a nice CLI tool that handles the boilerplate for you. For me the generated NestJS project from the CLI is a perfect starter. 
-
- 
-
-The boilerplate: 
-
- 
+## The boilerplate: 
 
 I have used the NestJS CLI a couple of times now and I know and understand all of the code it generates. It does not generate stuff I don’t need or understand. Why is this fact important? Because on the long run I have support and maintain all of the things in my project. Generated black magic code is gonne give me hard time building on top when I try to adjust or extend it. That’s why I always prefer starting super small and then adding the things I need over time and learning instead of using an overblown starter project that has a lot of stuff I don’t need, or I don’t understand. 
 
  
 
-Getting the project ready
-
- 
+## Getting the project ready
 
 Okay cool, Let’s get started by generating our project with these few lines: 
+```bash
+npm i -g @nestjs/cli
+nest new project-name
+```
+more on the nestjs and it's cli [here](https://docs.nestjs.com/)
+
+Your project will look something like this:
+
+<screenshot-1>
+
+Lets give it a test run to see if all works so far with.  
+```
+npm run start:dev
+```
 
  
 
-<code>
-
- 
-
-Your project will look something like this
-
-<screenshot>
-
- 
-
-Adding the database.
+Setting up the database server.
 
 So now we have our project baselines setup, let’s add some data persistence layer. 
 
