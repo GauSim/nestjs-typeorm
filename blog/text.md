@@ -32,8 +32,6 @@ Lets give it a test run to see if all works so far with.
 npm run start:dev
 ```
 
- 
-
 ## Setting up the database server.
 
 So now we have our project baselines setup, let’s add some data persistence layer. 
@@ -87,105 +85,233 @@ Sweet, now we have a command we can call and it would setup the DB server.
 
 To make the process more robust, we will always use the same name for the docker container - like this we can add an additional check - if the container is running already kill it to ensure a clean state. We will come to why this is a good practice later in the “seed data section”.
 
- 
-
-Connecting to your database.
-
- 
+## Connecting to your database.
 
 Like for everything, there is already an NPM module that helps you hooking the NestJS project to your database. Let’s add TypeORM support to our project by using the prebuild NestJS-to-TypeORM module. 
 
 You can add it like this:
-
-<link> 
-
+```bash
+npm install --save @nestjs/typeorm typeorm pg
+```
+Full docs can be found [here](https://docs.nestjs.com/techniques/database).
  
 
-Configuration management 
-
- 
+## Configuration management 
 
 Now it’s time to hookup things. The way we can tell TypeORM in NestJS to which database server to connect to, is by using the TypeOrmModule. It has a “forRoot” method we can pass the config to.
 
- 
-
 But here is the challenge. We know that the config will be different on local development and on the production environment. So, this process somehow has to be generic so it can provide different configs for these cases. 
-
- 
 
 To make this work nicely we can write the following Config service. The idea of this config class is to run before our API Server main.ts starts. It will then have the configuration preloaded from environment variables being able to provide the values then at runtime in a read only manner. 
 
+To make this flexible for dev and prod we will use the [dotenv module](https://www.npmjs.com/package/dotenv). 
+You can add it like this:
+```bash
+npm install --save dotenv
+```
+With this module we can have a “.env” file in our project on local development to prepare the config values and on production we can just read the values from the environment variables on our production server. This is a pretty flexible approach and also allows you to share the config with other dev’s in your team easy with one file. (I would highly recommend to git ignore this file though, as you might end up putting actual secrets in this file and you for sure don’t want to leak these out of your project, or commit them by accident) 
+
  
-
-To make this flexible for dev and prod we will use the “dotenv” module (<link>). With this module we can have a “.env” file in our project on local development to prepare the config values and on production we can just read the values from the environment variables on our production server. This is a pretty flexible approach and also allows you to share the config with other dev’s in your team easy with one file. (I would highly recommend to git ignore this file though, as you might end up putting actual secrets in this file and you for sure don’t want to leak these out of your project, or commit them by accident) 
-
- 
-
 This is how your .env file could look like:
-
-<code> 
-
- 
+```bash
+POSTGRES_HOST=127.0.0.1
+POSTGRES_PORT=5432
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=mysecretpassword
+POSTGRES_DATABASE=my_database
+```
 
 So, our ConfigService would run as a singleton service, loading the config values and providing them to other modules at start. We will include an error early pattern in the service. Meaning it will throw meaning full error if it is asked for configuration it is not able to provide. This makes your setup more robust as you will detect configuration errors at build/boot time, not at runtime. Like this you will be able to detect this early when you deploy or start your server, not when you or worse a consumer uses your app.
 
- 
-
 This is how your ConfigService could look like. 
 
-<code>
+```typescript
+import { TypeOrmModuleOptions } from '@nestjs/typeorm';
 
- 
+require('dotenv').config(); // will load the values from the .env file
 
-Define your data model entities.
+export class ConfigService {
+  constructor(private env: { [k: string]: string | undefined }) { }
 
- 
+  private getValue(key: string, throwOnMissing = true): string {
+    const value = this.env[key];
+    if (!value && throwOnMissing) {
+      throw new Error(`config error - missing env.${key}`);
+    }
 
-As mentioned earlier, TypeORM is able to synchronize your data model into tables in your database. This synchronization of the model is nice, but also dangerous. 
+    return value;
+  }
 
- 
+  public getPort() {
+    return this.getValue('PORT', true);
+  }
 
-Why? In early development it’s great - you don’t have all your data models figured out jet. So, you change the Model in code, and all just works out nicely on the database. Basically, you don’t have to think about the state of your database that much. 
+  public isProduction() {
+    const mode = this.getValue('MODE', false);
+    return mode != 'DEV';
+  }
 
- 
+  public getTypeOrmConfig(): TypeOrmModuleOptions {
+    return {
+      type: 'postgres',
 
-But here comes the tricky part. Once you have data in your database you do not want to lose on every model changes it get a bit more complicated. This Schema Sync works in a way, that it would to apply the necessary changes to your database tables drop and recreate them. Meaning you lose the data inside the table. What of cause in production you should avoid.
+      host: this.getValue('POSTGRES_HOST'),
+      port: parseInt(this.getValue('POSTGRES_PORT')),
+      username: this.getValue('POSTGRES_USER'),
+      password: this.getValue('POSTGRES_PASSWORD'),
+      database: this.getValue('POSTGRES_DATABASE'),
 
- 
+      entities: ['**/*.entity{.ts,.js}'],
 
-But for this step let’s keep the sync on for a moment to get started. TypeORM supports auto loading of your data model entities. You can simply place all of them in one folder and load them with a pattern like in your configuration.
+      migrationsTableName: 'migration',
 
-<screenshot>
+      migrations: ['src/migration/*.ts'],
 
- 
+      cli: {
+        migrationsDir: 'src/migration',
+      },
+
+      ssl: this.isProduction(),
+    };
+  }
+
+}
+
+const configService = new ConfigService(process.env); // create a singleton
+
+export { configService };
+```
+
+Then we simply hook the `ConfigService` to our NestJS Module like this: 
+```typescript
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
+import { configService } from './config/config.service';
+
+@Module({
+  imports: [
+    TypeOrmModule.forRoot(configService.getTypeOrmConfig())
+  ],
+  controllers: [AppController],
+  providers: [AppService],
+})
+export class AppModule { }
+```
+
+We are nearly ready to give it a first spinn, but because we actually want to work in typescript in development, 
+we will use `nodemon` with deticated a `nodemon.json` to start our development server to run it with the `ts-node` module. 
+
+so lets install `nodemon` and `ts-node`.
+```bash
+npm i --save-dev nodemon ts-node
+```
+
+and we add a `nodemon.json` file: 
+```json
+{
+  "watch": [
+    "src"
+  ],
+  "ext": "ts",
+  "ignore": [
+    "src/**/*.spec.ts"
+  ],
+  "exec": "node --inspect=127.0.0.1:9223 -r ts-node/register -- src/main.ts",
+  "env": { }
+}
+```
+finally we change the `start:dev` script in the `package.json` to:
+
+```json
+{
+  "start:dev": "nodemon --config nodemon.json"
+}
+```
+
+now we can run `npm run start:dev` to start our api server, on start it should pick up the config from the configService what then will connect typeORM to our database.
+
+## Define your data model entities.
+
+As mentioned earlier, TypeORM is able to synchronize your data model into tables in your database. 
+This synchronization of the model is nice, but also dangerous.
+
+Why? In early development it’s great - you don’t have all your data models figured out jet. So, you change the Model in code, and all just works out nicely on the database. Basically, you don’t have to think about the state your database is in that much. 
+
+But here comes the tricky part. Once you have actual data in your database you do not want to lose on every model change it get a bit more complicated. This sync works in a way, that it would to apply the necessary changes to your database tables by drop and recreating them. Meaning you lose the data inside the table. What of cause in production you should avoid.
+
+TypeORM supports auto loading of your data model entities. You can simply place all of them in one folder and load them with a pattern in your configuration we put ours `model/<name>.entity.ts`. (see the `entities` prop on the `TypeOrmModuleOptions` in the `ConfigService`) 
+
+<screenshot-2>
+
+Another nice feature from TypeORM is that these entity models support inheritance. 
+What is greate if you for example have certain data fields you want every of your entities to have, 
+for example like an auto generated uuid `id`-field or a `createDateTime`-field.
 
 So, defining your data model in TypeORM would look something like this: 
+`base.entity.ts`
+```typescript 
+import { PrimaryGeneratedColumn, Column, UpdateDateColumn, CreateDateColumn } from 'typeorm';
 
-<code>
+export abstract class BaseEntity {
+    @PrimaryGeneratedColumn('uuid')
+    id: string;
 
- 
+    @Column({ type: 'boolean', default: true })
+    isActive: boolean;
 
-Party time - Let’s start our API and see if it works. By running 
+    @Column({ type: 'boolean', default: false })
+    isArchived: boolean;
+
+    @CreateDateColumn({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
+    createDateTime: Date;
+
+    @Column({ type: 'varchar', length: 300 })
+    createdBy: string;
+
+    @UpdateDateColumn({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
+    lastChangedDateTime: Date;
+
+    @Column({ type: 'varchar', length: 300 })
+    lastChangedBy: string;
+
+    @Column({ type: 'varchar', length: 300, nullable: true })
+    internalComment: string | null;
+}
+```
+ and `item.entity.ts`
+```typescript 
+import { Entity, Column } from 'typeorm';
+import { BaseEntity } from './base.entity';
+
+@Entity({ name: 'item' })
+export class Item extends BaseEntity {
+
+  @Column({ type: 'varchar', length: 300 })
+  name: string;
+
+  @Column({ type: 'varchar', length: 300 })
+  description: string;
+
+}
+```
+
+## Party time - Let’s start our API and see if it works. By running 
 
 <code start DB> 
 
 <code start API>
 
- 
-
 Cool, it does not crash - but does our database actually reflect our data model? 
-
 We can check this by running some cli queries against the DB or using a database management tool for quick debugging. 
 
- 
 
 When working with postgres database I use <tool>
 
 It’s a pretty powerful tool with a nice UI to see what’s going on. However, I would recommend you the following workflow:
 
 Avoid „manual changes” on your database using tools, rather apply code changes in your project to reflect this in the database. Why? Because this is reproducible, and you have less chances running into „well it works on my machine but does not on another one“.
-
- 
 
 Okay nice - we can now see that our tables got created in the database.
 
@@ -199,44 +325,29 @@ This will help you decouple things and make maintenance Easier in the long run. 
 
 <link> 
 
- 
-
 This is how a simple service and response DTO could look like. 
 
 <code> 
 
- 
-
-Defining a seed. 
-
- 
+## Defining a seed script. 
 
 We have nearly everything we need to scale our project with fancy business logic now. What will really boost your and your team’s productivity when working on the project is a data seed script. 
 
 This is a script that will setup your database with test data. Remember we added a script that automatically create a database server and an empty database ready to use. Now we add a script that will generate „meaningful data“ in that database. This helps with local development (as everybody works locally on the same dataset, but also with running integration tests against a standing system as you kind of know what the state of your persistence should be) 
 
- 
-
 We write the script in a way that is uses our already defined model. Because in the inversion of control of the dependency injection in NestJS we can create instances of our repositories and services from our project kind of manually without starting an API Server. This is pretty neat as this kind of dry run tests your code, as well as you are able to run the seed process in stand-alone before your launch your actual server. So, you seed script logic does not bleed into your actual business logic code. I usually write my seed scripts in a very generic way, so it works stand alone in a single run, not depending on anything else with randomizing the values it puts in with a random value. This is nice, because then you can run the script over and over again producing more data. 
-
- 
 
 To establish the database connection in our script we will just reuse the config service we have written and run it using the ts-node module. 
 
- 
 
 This is how a seed script could look like:
 
 <seed script> 
 
- 
-
 You can now add an NPM script task you can either run right after the DB setup script and before the server start or on its own to create more data. 
-
- 
 
 Nice setup done - but there is one more thing. Let’s get rid of this Schema sync. Why? Because this we will not be able to do in production, as early mentioned - when the server starts and the sync happens, we lose data. So, let’s handle the Data migration part. Lucky TypeORM comes with a solution and a CLI for this. 
 
- 
+Turn off Model sync as early as possible and Running migrations.
 
-Turn off Model sync as early as possible and Running migrations 
+Run migrations on start with flag.
