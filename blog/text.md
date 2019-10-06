@@ -383,7 +383,7 @@ if [ "$RUN_MIGRATIONS" ]; then
 fi
 
 echo "START SERVER";
-cd dist && node main.js
+npm run start:prod
 ```
 
 ## Debugging the database 
@@ -391,14 +391,20 @@ cd dist && node main.js
 Cool, it does not crash - but does our database actually reflect our data model? 
 We can check this by running some cli queries against the DB or using a database management tool for quick debugging. 
 
-When working with postgres database I use <tool>
+When working with postgres database I use [pgAdmin](https://www.pgadmin.org/)
 
 It’s a pretty powerful tool with a nice UI to see what’s going on. However, I would recommend you the following workflow:
 
 Avoid „manual changes” on your database using tools, rather apply code changes in your project to reflect this in the database. Why? Because this is reproducible, and you have less chances running into „well it works on my machine but does not on another one“.
 
-Okay nice - we can now see that our tables got created in the database.
+<screenshot-4>
 
+Okay nice - we can now see that our tables got created in the database.
+1. our item table we defined in our project
+2. a migration table, in this table typeORM keeps track which migration was executed on this database already. (you should treat this table read only also) 
+
+
+## Adding some business logic
 Let’s add some business logic now. Just for demo I’ll just add a simple endpoint that will return the data in the table. 
 
 For this will add a DTO response module that will be filled by the data model entity.

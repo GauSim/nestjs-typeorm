@@ -8,4 +8,4 @@ if [ "$RUN_MIGRATIONS" ]; then
 fi
 
 echo "START SERVER";
-cd dist && node main.js
+npm run start:prod
