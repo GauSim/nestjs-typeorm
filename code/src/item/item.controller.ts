@@ -1,5 +1,6 @@
 import { Controller, Get } from '@nestjs/common';
 import { ItemService } from './item.service';
+import { ItemDTO } from './item.dto';
 
 @Controller('item')
 export class ItemController {
@@ -8,7 +9,8 @@ export class ItemController {
   }
 
   @Get()
-  public async getAll() {
-    return await this.serv.getAll();
+  public async getAll(): Promise<ItemDTO[]> {
+    return await this.serv.getAll()
+      .then(items => items.map(it => ItemDTO.fromEntity(it)));
   }
 }

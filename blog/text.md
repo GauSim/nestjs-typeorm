@@ -502,7 +502,7 @@ I would always recommend this setup. So, you have a clear distinction between yo
 
 Some more win's: 
 - seperation to apply domain driven design principles    
-- performance, you can optimize things much easier
+- performance, optimize queries much easier
 - evolution, versioning - different responses with the same persistence 
 - testabillity - mocking things 
 ... and a lot more 
@@ -535,6 +535,15 @@ export class ItemDTO implements Readonly<ItemDTO> {
     return it;
   }
 }
+```
+now we can simply do 
+```typescript
+// ...
+  public async getAll(): Promise<ItemDTO[]> {
+    return await this.repo.find()
+      .then(items => items.map(it => ItemDTO.fromEntity(it)));
+  }
+// ...
 ```
 
 ## Defining a seed script. 
