@@ -128,7 +128,7 @@ This is how your `ConfigService` could look like.
 ```typescript
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
 
-require('dotenv').config(); // will load the values from the .env file or the env
+require('dotenv').config(); // load values from .env file or the env
 
 export class ConfigService {
   constructor(private env: { [k: string]: string | undefined }) { }
@@ -498,7 +498,7 @@ Its tempting to short cut this in your initial project setup as the benefits of 
 But somehow in every project i have worked on introducing this approch from the beginning has payes off. 
 Regadless if i have build a REST, view-model resource, odata or graphQL driven APIs. 
 
-I would always recommend this setup. So, you have a clear distinction between your internal data model (API to Database) and your external model (API-consumer to API). This will help you decouple things and make maintenance Easier in the long run. This also enable you to generate an API documentation (open API aka swagger doc) from these DTOs. See how that works in NestJS (here)[https://docs.nestjs.com/recipes/swagger] 
+I would always recommend this setup. So, you have a clear distinction between your internal data model (API to Database) and your external model (API-consumer to API). This will help you decouple things and make maintenance Easier in the long run. 
 
 Some more win's: 
 - seperation to apply domain driven design principles    
@@ -523,45 +523,138 @@ export class ItemDTO implements Readonly<ItemDTO> {
   @IsUUID()
   id: string;
 
-
   @ApiModelProperty({ required: true })
   @IsString()
   name: string;
 
   public static fromEntity(entity: Item) {
-    const it = new ItemDTO();
-    it.id = entity.id;
-    it.name = entity.name;
+    const dto = new ItemDTO();
+    dto.id = entity.id;
+    dto.name = entity.name;
     return it;
   }
 }
 ```
-now we can simply do 
+now we can simply use the dto like this 
+
 ```typescript
-// ...
+  // item.controller.ts
+  @Get()
+  public async getAll(): Promise<ItemDTO[]> {
+    return await this.serv.getAll()
+  }
+
+  @Post()
+  public async post(@User() user: User, @Body() dto: ItemDTO): Promise<ItemDTO> {
+    return this.serv.create(dto, user);
+  }
+```
+and
+```typescript
+  // item.service.ts
   public async getAll(): Promise<ItemDTO[]> {
     return await this.repo.find()
-      .then(items => items.map(it => ItemDTO.fromEntity(it)));
+      .then(items => items.map(e => ItemDTO.fromEntity(e)));
   }
-// ...
+
+  public async create(dto: ItemDTO, user: User): Promise<ItemDTO> {
+    return this.repo.save(dto.toEntity(user))
+      .then(e => ItemDTO.fromEntity(e));
+  }
 ```
 
-## Defining a seed script. 
+## Setting up OpenAPI (Swagger)
+The DTO approch also enable you to generate an API documentation (openAPI aka swagger docs) from them. For this simply 
+install:
+`npm install --save @nestjs/swagger swagger-ui-express`
+
+and add 
+```typescript
+// main.ts
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+
+  if (!configService.isProduction()) {
+
+    const document = SwaggerModule.createDocument(app, new DocumentBuilder()
+      .setTitle('Item API')
+      .setDescription('My Item API')
+      .build());
+
+    SwaggerModule.setup('docs', app, document);
+
+  }
+
+  await app.listen(3000);
+}
+```
+<screenshot-5>
+
+see more docs (here)[https://docs.nestjs.com/recipes/swagger] 
+
+
+## Defining a seed. 
 
 We have nearly everything we need to scale our project with fancy business logic now. What will really boost your and your team’s productivity when working on the project is a data seed script. 
 
-This is a script that will setup your database with test data. Remember we added a script that automatically create a database server and an empty database ready to use. Now we add a script that will generate „meaningful data“ in that database. This helps with local development (as everybody works locally on the same dataset, but also with running integration tests against a standing system as you kind of know what the state of your persistence should be) 
+This is a script that will setup your database with test or dummy data. Remember we added a script that automatically create a database server and an empty database ready to use. Now we add a script that will generate „meaningful dummy data“ in that database. This helps with development (as everybody works locally on the same dataset, but also with running integration tests against a test system as you know what the state of your persistence should be in) 
 
-We write the script in a way that is uses our already defined model. Because in the inversion of control of the dependency injection in NestJS we can create instances of our repositories and services from our project kind of manually without starting an API Server. This is pretty neat as this kind of dry run tests your code, as well as you are able to run the seed process in stand-alone before your launch your actual server. So, you seed script logic does not bleed into your actual business logic code. I usually write my seed scripts in a very generic way, so it works stand alone in a single run, not depending on anything else with randomizing the values it puts in with a random value. This is nice, because then you can run the script over and over again producing more data. 
+We write the script in a way that is uses our already defined model. Because of the inversion of control, the dependency injection in constructor we can create instances of our repositories and services from our project manually without starting an API Server just providing the database connection our self. 
 
-To establish the database connection in our script we will just reuse the config service we have written and run it using the ts-node module. 
+This is pretty neat - as this kind of dry run tests your code, as well as you are able to run the seed process in stand-alone before your launch your actual server. So, you seed script logic does not bleed into your actual business logic code. I usually write my seed scripts in a very generic way, so it works stand alone in a single run, not depending on anything else just randomizing values and an seed-id. This is nice, because then you can run the script over and over again producing more data. 
 
+To establish the database connection in our script we will just reuse the configService we have written and run it using the ts-node module. 
 
 This is how a seed script could look like:
+```typescript
+// scripts/seed.ts
+import * as _ from 'lodash';
+import { createConnection, ConnectionOptions } from 'typeorm';
+import { configService } from '../config/config.service';
+import { User } from '../user.decorator';
+import { ItemService } from '../item/item.service';
+import { Item } from '../model/item.entity';
+import { ItemDTO } from '../item/item.dto';
 
-<seed script> 
+async function run() {
+
+  const seedUser: User = { id: 'seed-user' };
+
+  const seedId = Date.now()
+    .toString()
+    .split('')
+    .reverse()
+    .reduce((s, it, x) => (x > 3 ? s : (s += it)), '');
+
+  const opt = {
+    ...configService.getTypeOrmConfig(),
+    debug: true
+  };
+
+  const connection = await createConnection(opt as ConnectionOptions);
+  const itemService = new ItemService(connection.getRepository(Item));
+
+  const work = _.range(1, 10)
+    .map(n => ItemDTO.from({
+      name: `seed${seedId}-${n}`,
+      description: 'created from seed'
+    }))
+    .map(dto => itemService.create(dto, seedUser)
+      .then(r => (console.log('done ->', r.name), r)))
+
+  return await Promise.all(work);
+}
+
+run()
+  .then(_ => console.log('...wait for script to exit'))
+  .catch(error => console.error('seed error', error));
+
+```
 
 You can now add an NPM script task you can either run right after the DB setup script and before the server start or on its own to create more data. 
 
-
-Run migrations on start with flag.
+```javascript 
+{
+  "start:dev:db:seed": "ts-node -r tsconfig-paths/register src/scripts/seed.ts"
+}
+```

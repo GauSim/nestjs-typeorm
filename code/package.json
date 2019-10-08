@@ -12,6 +12,7 @@
     "start:prod": "ts-node -r dotenv/config -r tsconfig-paths/register src/main.ts",
     "start:dev": "nodemon --config nodemon.json",
     "start:dev:db": "./src/scripts/start-db.sh",
+    "start:dev:db:seed": "ts-node -r tsconfig-paths/register src/scripts/seed.ts",
     "start:debug": "nest start --debug --watch",
     "lint": "tslint -p tsconfig.json -c tslint.json",
     "test": "jest",
@@ -34,10 +35,12 @@
     "class-transformer": "^0.2.3",
     "class-validator": "^0.10.1",
     "dotenv": "^8.1.0",
+    "lodash": "^4.17.15",
     "pg": "^7.12.1",
     "reflect-metadata": "^0.1.13",
     "rimraf": "^3.0.0",
     "rxjs": "^6.5.3",
+    "swagger-ui-express": "^4.1.2",
     "typeorm": "^0.2.19"
   },
   "devDependencies": {
@@ -46,6 +49,7 @@
     "@nestjs/testing": "^6.7.1",
     "@types/express": "^4.17.1",
     "@types/jest": "^24.0.18",
+    "@types/lodash": "^4.14.142",
     "@types/node": "^12.7.5",
     "@types/supertest": "^2.0.8",
     "jest": "^24.9.0",
