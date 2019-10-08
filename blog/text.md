@@ -1,4 +1,4 @@
-# Local development setup working with Database migrations In TypeORM, NestJS postgres and docker. 
+# NestJS, TypeORM and postgres - example development setup working with database migrations. 
 
 Working with stateful data and databases is hard, especially when your project grows overtime. To have a good development and project setup right from the beginning is essential for the success of your development project. In this Post I want to show you how I have setup most of the projects and try to highlight some of the thoughts behind the setup. 
 
@@ -8,13 +8,13 @@ In this example we’ll work on a simple NodeJS API that is powered by a Postgre
 
  To build the API in NodeJS we will use NestJS. It’s a pretty flexible framework and is built on ExpressJS principals and lets you craft out NodeJS services in no time as it comes with a lot of goodies (like full typescript support, dependency injection, module management) backed in. To kick off things even faster it comes with a nice CLI tool that handles the boilerplate for us. For me the generated NestJS project from the CLI is a perfect starter. 
 
-## The boilerplate: 
+## project setup - the boilerplate 
 
-I have used the NestJS CLI a couple of times now and I know and understand all of the code it generates. It does not generate stuff I don’t need or understand. Why is this fact important? Because on the long run you will have to support and maintain all of the things in the project. Generated `black magic code` is gonne give us a hard time building on top when we try to adjust or extend it without knowing what it actually does. That’s why I always prefer starting super small and then adding the things I need over time and learning instead of using an overblown starter project that has a lot of stuff I don’t need, or I don’t understand. 
+I have used the NestJS CLI a couple of times now and I know and understand all of the code it generates. It does not generate stuff I don’t need or understand. 
+Why is this fact important? Because on the long run you will have to support and maintain all of the things in the project. Generated `black magic code` is gonne give us a hard time building on top when we try to adjust or extend it without knowing what it actually does. That’s why I always prefer starting super small and then adding the things I need over time and learning instead of using an overblown starter project that has a lot of stuff I don’t need, or I don’t understand. 
 
- 
 
-## Getting the project ready
+## getting the project ready
 
 Okay cool, Let’s get started by generating our project with these few lines: 
 ```bash
@@ -55,8 +55,7 @@ SERVER="my_database_server";
 PW="mysecretpassword";
 DB="my_database";
 
-echo "echo stop & remove old docker [$SERVER]";
-echo "echo starting new fresh instance of [$SERVER]"
+echo "echo stop & remove old docker [$SERVER] and starting new fresh instance of [$SERVER]"
 (docker kill $SERVER || :) && \
   (docker rm $SERVER || :) && \
   docker run --name $SERVER -e POSTGRES_PASSWORD=$PW \
@@ -74,18 +73,14 @@ echo "\l" | docker exec -i $SERVER psql -U postgres
 ``` 
 
 Lets add that command to our package.json run-scripts so we can easy execute it.
-```json
-...
-    "start:dev": "nest start --watch",
-    "start:dev:db": "./src/scripts/start-db.sh",
-    "start:debug": "nest start --debug --watch",
-...
+```javascript
+    "start:dev:db": "./src/scripts/start-db.sh"
 ```
-Sweet, now we have a command we can call and it would setup the DB server.
+Sweet, now we have a command we can run and it would setup the database server and a plain database to start with.
 
-To make the process more robust, we will always use the same name for the docker container - like this we can add an additional check - if the container is running already kill it to ensure a clean state. We will come to why this is a good practice later in the “seed data section”.
+To make the process more robust, we will always use the same name for the docker container (`$SERVER` var in the script) - like this we can add an additional check - if the container is running already kill and remove it to ensure a clean state.
 
-## Connecting to your database.
+## Connecting to NestJS and your database.
 
 Like for everything, there is already an NPM module that helps you hooking the NestJS project to your database. Let’s add TypeORM support to our project by using the prebuild NestJS-to-TypeORM module. 
 
@@ -98,18 +93,22 @@ Full docs can be found [here](https://docs.nestjs.com/techniques/database).
 
 ## Configuration management 
 
-Now it’s time to hookup things. The way we can tell TypeORM in NestJS to which database server to connect to, is by using the TypeOrmModule. It has a “forRoot” method we can pass the config to.
+Now it’s time to hookup things. 
+The way we can tell TypeORM in NestJS to which database server to connect to, is by using the TypeOrmModule. It has a `forRoot` method we can pass the config to.
 
 But here is the challenge. We know that the config will be different on local development and on the production environment. So, this process somehow has to be generic so it can provide different configs for these cases. 
 
-To make this work nicely we can write the following Config service. The idea of this config class is to run before our API Server main.ts starts. It will then have the configuration preloaded from environment variables being able to provide the values then at runtime in a read only manner. 
+To make this work nicely we can write the following config service. 
+The idea of this config class is to run before our API Server main.ts starts. It can read the configuration from environment variables being able to provide the values then at runtime in a read only manner. 
 
 To make this flexible for dev and prod we will use the [dotenv module](https://www.npmjs.com/package/dotenv). 
 You can add it like this:
 ```bash
 npm install --save dotenv
 ```
-With this module we can have a “.env” file in our project on local development to prepare the config values and on production we can just read the values from the environment variables on our production server. This is a pretty flexible approach and also allows you to share the config with other dev’s in your team easy with one file. (I would highly recommend to git ignore this file though, as you might end up putting actual secrets in this file and you for sure don’t want to leak these out of your project, or commit them by accident) 
+
+With this module we can have a “.env” file in our project root on local development to prepare the config values and on production we can just read the values from the environment variables on our production server. This is a pretty flexible approach and also allows you to share the config with other dev’s in your team easy with one file. 
+Note: I would highly recommend to git ignore this file though, as you might end up putting actual secrets in this file and you for sure don’t want to leak these out of your project, or commit them by accident
 
  
 This is how your .env file could look like:
@@ -119,6 +118,9 @@ POSTGRES_PORT=5432
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=mysecretpassword
 POSTGRES_DATABASE=my_database
+PORT=3000
+MODE=DEV
+RUN_MIGRATIONS=true
 ```
 
 So, our `ConfigService` would run as a singleton service, loading the config values on start and providing them to other modules. We will include an error-early pattern in the service. Meaning it will throw meaning full errors if it is asked for values it is not able to provide. This makes your setup more robust as you will detect configuration errors at build/boot time, not at runtime lifecycle. Like this you will be able to detect this early when you deploy / start your server, not when a consumer uses your api.
@@ -126,11 +128,13 @@ So, our `ConfigService` would run as a singleton service, loading the config val
 This is how your `ConfigService` could look like. 
 
 ```typescript
+// src/config/config.service.ts
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
 
-require('dotenv').config(); // load values from .env file or the env
+require('dotenv').config();
 
-export class ConfigService {
+class ConfigService {
+
   constructor(private env: { [k: string]: string | undefined }) { }
 
   private getValue(key: string, throwOnMissing = true): string {
@@ -140,6 +144,11 @@ export class ConfigService {
     }
 
     return value;
+  }
+
+  public ensureValues(keys: string[]) {
+    keys.forEach(k => this.getValue(k, true));
+    return this;
   }
 
   public getPort() {
@@ -164,19 +173,28 @@ export class ConfigService {
       entities: ['**/*.entity{.ts,.js}'],
 
       migrationsTableName: 'migration',
+
       migrations: ['src/migration/*.ts'],
+
       cli: {
         migrationsDir: 'src/migration',
       },
-      synchronize: false,
+
       ssl: this.isProduction(),
     };
   }
 
 }
 
-// create and export the singleton instance
-const configService = new ConfigService(process.env);
+const configService = new ConfigService(process.env)
+  .ensureValues([
+    'POSTGRES_HOST',
+    'POSTGRES_PORT',
+    'POSTGRES_USER',
+    'POSTGRES_PASSWORD',
+    'POSTGRES_DATABASE'
+  ]);
+
 export { configService };
 ```
 
@@ -229,7 +247,7 @@ finally we change the `start:dev` script in the `package.json` to:
 
 Like this we can run `npm run start:dev` to start our API-server, 
 that on start it should pick up the `.env`-values from the `ConfigService` 
-what then will connect typeORM to our database - sweet!
+what then will connect typeORM to our database and it's not bound to my machine - sweet!
 
 ## Define and load data model entities.
 
@@ -487,7 +505,7 @@ export class ItemModule { }
 
 after starting the API a curl should give us: 
 ```bash 
-curl localhost:3000/item 
+curl localhost:3000/item | jq
 [] # << indicating no items in the DB :)
 ```
 
@@ -657,4 +675,32 @@ You can now add an NPM script task you can either run right after the DB setup s
 {
   "start:dev:db:seed": "ts-node -r tsconfig-paths/register src/scripts/seed.ts"
 }
+```
+
+so we get 
+after starting the API a curl should give us: 
+```bash 
+
+npm run start:dev:db:seed 
+
+# gives us 
+# done -> seed2302-1
+# done -> seed2302-2
+# ...wait for script to exit
+
+```
+
+and
+
+```javascript
+curl localhost:3000/item | jq
+
+[
+  {
+    "id": "393a370b-762b-44fb-9830-9526a1d6a685",
+    "name": "seed8239-1",
+    "description": "created from seed"
+  },
+  // ...
+]
 ```
