@@ -1,8 +1,8 @@
-# NestJS, TypeORM and postgres - example development setup working with database migrations. 
+# NestJS, TypeORM and PostgreSQL - example development setup working with database migrations. 
 
 Working with stateful data and databases is hard, especially when your project grows overtime. To have a good development and project setup right from the beginning is essential for the success of your development project. In this Post I want to show you how I have setup most of the projects and try to highlight some of the thoughts behind the setup. 
 
-In this example we’ll work on a simple NodeJS API that is powered by a Postgres database for data storage. 
+In this example we’ll work on a simple NodeJS API that is powered by a PostgreSQL database for data storage. 
 
 <architecture diagram>
 
@@ -80,9 +80,9 @@ Sweet, now we have a command we can run and it would setup the database server a
 
 To make the process more robust, we will always use the same name for the docker container (`$SERVER` var in the script) - like this we can add an additional check - if the container is running already kill and remove it to ensure a clean state.
 
-## Connecting to NestJS and your database.
+## Connecting NestJS to your database
 
-Like for everything, there is already an NPM module that helps you hooking the NestJS project to your database. Let’s add TypeORM support to our project by using the prebuild NestJS-to-TypeORM module. 
+Like for everything, there is already an NPM module that helps you hooking the NestJS project to your database. Let’s add TypeORM support to our project by using the pre-build NestJS-to-TypeORM module. 
 
 You can add it like this:
 ```bash
@@ -314,7 +314,7 @@ Find more supported data annotaions in the typeORM docs.
 
 start the db server 
 ```bash 
-npm start:dev:db
+npm run start:dev:db
 ```
 
 start the api server
@@ -341,9 +341,9 @@ So lets handle this - lucky TypeORM comes with a solution and `CLI` commands for
 Here is how to set that typeORM CLI up nicely. 
 
 ### 1. setup for the typeORM CLI 
-we have already added all nessesary config with our `ConfigService`, 
+we have already added all necessary config with our `ConfigService`, 
 but the typeORM CLI works with an `ormconfig.json` where it expects the correct config to be in. 
-Also we would also like to run the CLI seperately from the actual API server. 
+Also we would also like to run the CLI separately from the actual API server. 
 
 lets add a quick helper script to write the config json file and add it to our `.gitignore`-list, 
 as we will generate it before using the CLI.
