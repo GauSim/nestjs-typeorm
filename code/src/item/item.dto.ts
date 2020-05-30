@@ -33,11 +33,11 @@ export class ItemDTO implements Readonly<ItemDTO> {
     });
   }
 
-  public toEntity(user: User = null) {
+  public static toEntity(dto: Partial<ItemDTO>, user: User = null) {
     const it = new Item();
-    it.id = this.id;
+    it.id = dto.id;
     it.name = this.name;
-    it.description = this.description;
+    it.description = dto.description;
     it.createDateTime = new Date();
     it.createdBy = user ? user.id : null;
     it.lastChangedBy = user ? user.id : null;

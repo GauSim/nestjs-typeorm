@@ -17,7 +17,7 @@ export class ItemService {
   }
 
   public async create(dto: ItemDTO, user: User): Promise<ItemDTO> {
-    return this.repo.save(dto.toEntity(user))
+    return this.repo.save(ItemDTO.toEntity(dto, user))
       .then(e => ItemDTO.fromEntity(e));
   }
 }
