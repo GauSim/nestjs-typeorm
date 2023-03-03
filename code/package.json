@@ -33,7 +33,7 @@
     "@nestjs/swagger": "^3.1.0",
     "@nestjs/typeorm": "^6.2.0",
     "class-transformer": "^0.2.3",
-    "class-validator": "^0.10.1",
+    "class-validator": "^0.14.0",
     "dotenv": "^8.1.0",
     "lodash": "^4.17.15",
     "pg": "^7.12.1",
